@@ -6,8 +6,10 @@ import androidx.lifecycle.MutableLiveData
 import br.com.diegomb.covid19infosdm.R
 import br.com.diegomb.covid19infosdm.model.Covid19Api.BASE_URL
 import br.com.diegomb.covid19infosdm.model.Covid19Api.COUNTRIES_ENDPOINT
+import br.com.diegomb.covid19infosdm.model.dataclass.ByCountryResponseList
 import br.com.diegomb.covid19infosdm.model.dataclass.CaseList
 import br.com.diegomb.covid19infosdm.model.dataclass.CountryList
+import br.com.diegomb.covid19infosdm.model.dataclass.DayOneResponseList
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonArrayRequest
 import com.android.volley.toolbox.Volley
@@ -50,24 +52,36 @@ class Covid19Service(val context: Context) {
         build()
     }.create(Covid19Api.RetrofitServices::class.java)
 
-    /*Acesso a Web Service usando Retrofit. Como os serviços retornam o mesmo tipo de resposta
-    * foram aglutionados numa mesm função*/
-    fun callService(countryName: String, status: String, service: String): MutableLiveData<CaseList> {
-        val caseList: MutableLiveData<CaseList> = MutableLiveData()
+    /* Acesso a Web Service usando Retrofit. Como os serviços retornam o mesmo tipo de resposta
+    * foram aglutinados numa mesma função */
+    fun <T> callService(countryName: String, status: String, tipoResposta: Class<T>): MutableLiveData<T> {
+        val responseList = MutableLiveData<T>()
 
-        //Callback usando pelos serviços que retornam o mesmo tipo de JSON
-        val callback = object: Callback<CaseList> {
-            override fun onResponse(call: Call<CaseList>, response: Response<CaseList>) {
+        /* Callback usado pelos serviços que retornam JSON */
+        val callback = object: Callback<T> {
+            override fun onResponse(call: Call<T>, response: Response<T>) {
                 if (response.isSuccessful){
-                    caseList.value = response.body()
+                    responseList.value = response.body()
                 }
             }
-
-            override fun onFailure(call: Call<CaseList>, t: Throwable) {
-                Log.e(context.getString(R.string.app_name), "")
+            override fun onFailure(call: Call<T>, t: Throwable) {
+                Log.e(context.getString(R.string.app_name), "Falha no acesso ao serviço")
             }
         }
 
-        return caseList
+        /* O Serviço correto é chamado */
+        when (tipoResposta) {
+            DayOneResponseList::class.java -> {
+                @Suppress("UNCHECKED_CAST")
+                retrofitServices.getDayOne(countryName, status).enqueue(callback as Callback<DayOneResponseList>)
+            }
+            ByCountryResponseList::class.java -> {
+                @Suppress("UNCHECKED_CAST")
+                retrofitServices.getByCountry(countryName, status).enqueue(callback as Callback<ByCountryResponseList>)
+            }
+        }
+
+        return responseList
     }
+
 }

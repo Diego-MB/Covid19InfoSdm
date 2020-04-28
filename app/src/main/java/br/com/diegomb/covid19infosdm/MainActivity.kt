@@ -9,7 +9,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
-import br.com.diegomb.covid19infosdm.model.dataclass.CaseList
+import br.com.diegomb.covid19infosdm.model.dataclass.*
 import br.com.diegomb.covid19infosdm.viewmodel.Covid19ViewModel
 import com.jjoe64.graphview.helper.DateAsXAxisLabelFormatter
 import com.jjoe64.graphview.series.DataPoint
@@ -175,15 +175,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun casesListToString(caseList: CaseList): String {
+    private inline fun <reified T: ArrayList<*>> casesListToString(responseList: T): String {
         val resultSb = StringBuffer()
-        caseList.forEach {
-            resultSb.append("Nome: ${it.country}\n")
-            if (it.province.isNotEmpty()){
-                resultSb.append("Estado/região: ${it.province}\n")
+
+        //Usando class.java para não ter que adicionar biblioteca de reflexão kotlin
+        responseList.forEach {
+            when(T::class.java){
+                DayOneResponseList::class.java -> {
+                    with(it as DayOneResponseListItem) {
+                        resultSb.append("Casos: ${it.cases}\n")
+                        resultSb.append("Data: ${it.date.substring(0,10)}\n\n")
+                    }
+                }
+                ByCountryResponseList::class.java -> {
+                    with(it as ByCountryResponseListItem) {
+                        this.province.takeIf { !this.province.isNullOrEmpty() }?.let { province ->
+                            resultSb.append("Estado/região: ${province}\n")
+                        }
+                        this.city.takeIf { !this.city.isNullOrEmpty() }?.let { city ->
+                            resultSb.append("Cidade: ${city}\n")
+                        }
+
+                        resultSb.append("Casos: ${this.cases}\n")
+                        resultSb.append("Casos: ${this.date.substring(0,10)}\n\n")
+                    }
+                }
             }
-            resultSb.append("Data: ${it.date.substring(0,10)}\n")
-            resultSb.append("Casos: ${it.cases}\n\n")
         }
         return resultSb.toString()
     }

@@ -4,11 +4,10 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.view.ViewParent
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModel
 import br.com.diegomb.covid19infosdm.model.dataclass.*
 import br.com.diegomb.covid19infosdm.viewmodel.Covid19ViewModel
 import com.jjoe64.graphview.helper.DateAsXAxisLabelFormatter
@@ -25,15 +24,26 @@ class MainActivity : AppCompatActivity() {
 
     /* Classe para os serviços que serão acessados */
     private enum class Information(val type: String){
-        DAY_ONE("Day one"),
-        BY_COUNTRY("By country")
+        DAY_ONE("Dia 1"),
+        BY_COUNTRY("Por país")
     }
 
     /* Classe para o status que será buscado no serviço */
     private enum class Status(val type: String){
-        CONFIRMED("Confirmed"),
-        RECOVERED("Recovered"),
-        DEATHS("Deaths")
+        CONFIRMED("Confirmados"),
+        RECOVERED("Recuperados"),
+        DEATHS("Mortos")
+    }
+
+    /* Traduz os valores selecionados para a lingua inglesa para ser usado na api*/
+    private fun convertStatusInEnglish(): String {
+        val statusInIngles = when(statusSp.selectedItem.toString()) {
+            Status.CONFIRMED.type -> "confirmed"
+            Status.RECOVERED.type -> "recovered"
+            Status.DEATHS.type -> "deaths"
+            else -> "status inválido"
+        }
+        return statusInIngles
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,15 +60,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun onRetrieveClick(view: View) {
-        when (infoSp.selectedItem.toString()) {
-            Information.DAY_ONE.type -> { fetchDayOne() }
-            Information.BY_COUNTRY.type -> { fetchByCountry() }
+        /* Verificação se o pais foi selecionado, caso não, mostra uma caixa de dialogo com informação */
+        if (countrySp.selectedItemPosition == 0){
+            val alertDialogBuild = AlertDialog.Builder(this)
+            alertDialogBuild.setTitle("Alerta")
+            alertDialogBuild.setMessage("Selecione um pais!!")
+            alertDialogBuild.setNeutralButton("OK", null)
+            val dialog: AlertDialog = alertDialogBuild.create()
+            dialog.show()
+        } else {
+            when (infoSp.selectedItem.toString()) {
+                Information.DAY_ONE.type -> { fetchDayOne() }
+                Information.BY_COUNTRY.type -> { fetchByCountry() }
+            }
         }
     }
 
     private fun countryAdapterInit() {
         /* Preenchido por Web Service */
         countryAdapter = ArrayAdapter<String>(this, android.R.layout.simple_list_item_1)
+        countryAdapter.add("Selecione o pais")
         countryNameSlugMap = mutableMapOf()
         countrySp.adapter = countryAdapter
         viewModel.fetchCountries().observe(
@@ -108,7 +129,7 @@ class MainActivity : AppCompatActivity() {
     private fun fetchDayOne() {
         val countrySlug = countryNameSlugMap[countrySp.selectedItem.toString()]!!
 
-        viewModel.fetchDayOne(countrySlug, statusSp.selectedItem.toString()).observe(
+        viewModel.fetchDayOne(countrySlug, convertStatusInEnglish()).observe(
             this,
             Observer { casesList ->
                 if (viewModeTextRb.isChecked) {
@@ -156,7 +177,7 @@ class MainActivity : AppCompatActivity() {
         val countrySlug = countryNameSlugMap[countrySp.selectedItem.toString()]!!
 
         modoGrafico(ligado = false)
-        viewModel.fetchByCountry(countrySlug, statusSp.selectedItem.toString()).observe(
+        viewModel.fetchByCountry(countrySlug, convertStatusInEnglish()).observe(
             this,
             Observer { casesList ->
                 resultTv.text = casesListToString(casesList)
@@ -174,6 +195,14 @@ class MainActivity : AppCompatActivity() {
             resultGv.visibility = View.GONE
         }
     }
+    /*Formata Data do "modo texto" para formato PT-BR*/
+    private fun convertDateForBrazil(date: String): String {
+
+        val date = SimpleDateFormat("yyyy-MM-dd").parse(date)
+        val newData = SimpleDateFormat("dd/MM/yyyy").format(date)
+
+        return newData
+    }
 
     private inline fun <reified T: ArrayList<*>> casesListToString(responseList: T): String {
         val resultSb = StringBuffer()
@@ -184,7 +213,9 @@ class MainActivity : AppCompatActivity() {
                 DayOneResponseList::class.java -> {
                     with(it as DayOneResponseListItem) {
                         resultSb.append("Casos: ${it.cases}\n")
-                        resultSb.append("Data: ${it.date.substring(0,10)}\n\n")
+                        resultSb.append("Data: ${convertDateForBrazil(it.date)}\n\n")
+//                        resultSb.append("Data: ${it.date.substring(0,10)}\n\n")
+//                        Log.e("Data", it.date + " " + convertDateForBrazil(it.date));
                     }
                 }
                 ByCountryResponseList::class.java -> {
